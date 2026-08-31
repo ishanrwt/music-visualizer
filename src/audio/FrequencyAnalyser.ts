@@ -17,6 +17,12 @@ export type FrequencyBands = {
   /** Fast-decaying transient envelope that spikes on bass onsets, 0–1. */
   beat: number
   /**
+   * Sharp high-band spectral-flux envelope, 0–1 — spikes on "mechanical" hits:
+   * clicks, snares, hats, metallic / percussive transients. Distinct from `beat`
+   * (which is the low-end kick). Very fast decay so it reads as a crack.
+   */
+  hit: number
+  /**
    * Spectral centroid, 0–1 — roughly "how bright / trebly the mix is right now".
    * Bass-heavy passage ≈ 0.1, cymbal-heavy passage ≈ 0.6. A slow envelope of
    * this is what shifts the palette as a song moves between sections.
@@ -78,6 +84,7 @@ export class FrequencyAnalyser {
     treble: 0,
     level: 0,
     beat: 0,
+    hit: 0,
     centroid: 0.25,
   }
   private rafId: number | null = null
@@ -86,10 +93,12 @@ export class FrequencyAnalyser {
   private midEnd: number
   private trebleEnd: number
   private prevBass = 0
+  private prevHi: Float32Array
 
   constructor(analyser: AnalyserNode) {
     this.analyser = analyser
     this.data = new Uint8Array(analyser.frequencyBinCount)
+    this.prevHi = new Float32Array(analyser.frequencyBinCount)
 
     const sampleRate = analyser.context.sampleRate
     const fftSize = analyser.fftSize
@@ -133,11 +142,27 @@ export class FrequencyAnalyser {
       this.snapshot.mid * 0.35 +
       this.snapshot.treble * 0.15
 
-    // Transient detection: rectified rise in raw bass, then a fast decay so it
-    // reads as a punch rather than a sustained level.
-    const rise = Math.max(0, rawBass - this.prevBass) * 4.0
+    // Bass transient: rectified rise in raw bass above a small floor, sharp
+    // decay so it reads as a punch. Gain is deliberately hot.
+    const rise = Math.max(0, rawBass - this.prevBass - 0.015) * 6.0
     this.prevBass = rawBass
-    this.snapshot.beat = Math.max(this.snapshot.beat * 0.8, Math.min(1, rise))
+    this.snapshot.beat = Math.max(this.snapshot.beat * 0.78, Math.min(1, rise))
+
+    // "Mechanical" hit: positive spectral flux across the high band. Sustained
+    // treble contributes nothing — only sharp per-bin rises (clicks, snares,
+    // metallic transients). Snappier decay than the bass beat.
+    let flux = 0
+    for (let i = this.midEnd + 1; i < this.trebleEnd && i < this.data.length; i++) {
+      const v = (this.data[i] ?? 0) / 255
+      const dv = v - this.prevHi[i]!
+      if (dv > 0) {
+        flux += dv
+      }
+      this.prevHi[i] = v
+    }
+    const span = Math.max(1, this.trebleEnd - this.midEnd - 1)
+    const hitRaw = Math.min(1, (flux / span) * 14)
+    this.snapshot.hit = Math.max(this.snapshot.hit * 0.72, hitRaw)
 
     // Spectral centroid over the full usable range, normalized to 0–1.
     let weighted = 0

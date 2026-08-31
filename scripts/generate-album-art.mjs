@@ -82,6 +82,8 @@ const outDir = path.resolve(
 )
 
 writePng(path.join(outDir, 'stateside.png'), gradient([232, 64, 148], [48, 72, 196]))
+writePng(path.join(outDir, 'stronger.png'), gradient([240, 168, 32], [28, 24, 72]))
+writePng(path.join(outDir, 'walk-it-talk-it.png'), gradient([16, 48, 40], [212, 168, 64]))
 writePng(path.join(outDir, 'bass-drone.png'), gradient([92, 12, 18], [220, 96, 28]))
 writePng(path.join(outDir, 'full-spectrum.png'), gradient([12, 140, 148], [196, 36, 168]))
 

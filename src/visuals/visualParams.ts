@@ -27,6 +27,8 @@ export type VisualParams = {
   trebleReact: number
   /** How hard bass onsets pulse the whole frame. */
   beatReact: number
+  /** How strongly "mechanical" high-band hits (clicks / snares) crack the frame. */
+  hitReact: number
 
   // -- Color ----------------------------------------------------------
   brightness: number
@@ -73,7 +75,8 @@ export const DEFAULT_PARAMS: VisualParams = {
   bassReact: 1.15,
   midReact: 1.15,
   trebleReact: 1.2,
-  beatReact: 1.15,
+  beatReact: 1.35,
+  hitReact: 1,
   brightness: 1.05,
   contrast: 1.22,
   saturation: 1.3,
@@ -113,6 +116,7 @@ export const VISUAL_PRESETS: VisualPreset[] = [
       midReact: 0.9,
       trebleReact: 0.7,
       beatReact: 0.5,
+      hitReact: 0.5,
       contrast: 1.1,
       saturation: 1.15,
       colorSpread: 0.4,
@@ -138,6 +142,7 @@ export const VISUAL_PRESETS: VisualPreset[] = [
       midReact: 1.3,
       trebleReact: 1.6,
       beatReact: 1.8,
+      hitReact: 1.4,
       brightness: 1.12,
       contrast: 1.35,
       saturation: 1.5,
@@ -190,6 +195,7 @@ export const VISUAL_PRESETS: VisualPreset[] = [
       midReact: 1.1,
       trebleReact: 1.4,
       beatReact: 1.4,
+      hitReact: 1.5,
       brightness: 1.0,
       contrast: 1.5,
       saturation: 1.1,
@@ -224,6 +230,7 @@ export const SLIDERS: SliderSpec[] = [
   { key: 'midReact', label: 'Mid', min: 0, max: 2, step: 0.01, group: 'Audio' },
   { key: 'trebleReact', label: 'Treble', min: 0, max: 2, step: 0.01, group: 'Audio' },
   { key: 'beatReact', label: 'Beat punch', min: 0, max: 2, step: 0.01, group: 'Audio' },
+  { key: 'hitReact', label: 'Mechanical hit', min: 0, max: 2, step: 0.01, group: 'Audio' },
 
   { key: 'brightness', label: 'Brightness', min: 0.3, max: 1.8, step: 0.01, group: 'Color' },
   { key: 'contrast', label: 'Contrast', min: 0.5, max: 2, step: 0.01, group: 'Color' },

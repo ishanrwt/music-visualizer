@@ -10,6 +10,7 @@ const SILENT_BANDS: FrequencyBands = {
   treble: 0,
   level: 0,
   beat: 0,
+  hit: 0,
   centroid: 0.25,
 }
 
@@ -47,6 +48,7 @@ export function useAudioAnalyser(analyserNode: AnalyserNode | null) {
         treble: snapshot.treble,
         level: snapshot.level,
         beat: snapshot.beat,
+        hit: snapshot.hit,
         centroid: snapshot.centroid,
       })
       rafId = requestAnimationFrame(tick)

@@ -19,6 +19,8 @@ uniform float uMid;
 uniform float uTreble;
 uniform float uLevel;
 uniform float uBeat;
+uniform float uBeatAge;
+uniform float uHit;
 
 uniform vec3 uC0;
 uniform vec3 uC1;
@@ -158,6 +160,9 @@ void main() {
   float aspect = uResolution.x / max(uResolution.y, 1.0);
   uv.x *= aspect;
 
+  // Mechanical hit — whole-frame shake (only strong hits, uHit^2).
+  uv += vec2(sin(uTime * 137.0), cos(uTime * 119.0)) * (uHit * uHit) * 0.02;
+
   float t = uFlowTime;
 
   // Warp amount is nearly static — audio barely nudges it, so the wave field
@@ -169,7 +174,8 @@ void main() {
   float cs = cos(rot);
   float sn = sin(rot);
   vec2 p = mat2(cs, -sn, sn, cs) * (uv * uScale);
-  p *= 1.0 - uBass * 0.04 - uBeat * 0.03;
+  // Bass thump — a sharp inward zoom pop on the hit.
+  p *= 1.0 - uBass * 0.04 - uBeat * 0.075;
 
   vec2 wp = warp(p, t, warpAmt);
 
@@ -221,7 +227,7 @@ void main() {
   float spread = 0.22 + uColorSpread * 0.55;
   float cpos = f * spread + gBase;
 
-  float chroma = uChroma * (0.015 + uTreble * 0.04 + uMid * 0.02);
+  float chroma = uChroma * (0.015 + uTreble * 0.04 + uMid * 0.02) + uHit * 0.13;
   vec3 color = vec3(
     palette(cpos + chroma).r,
     palette(cpos).g,
@@ -238,14 +244,21 @@ void main() {
   color *= 0.42 + 1.0 * waveLum;
 
   // Exposure — bounded so loud passages brighten but never blow out to white.
-  float exposure = min(1.55, 0.82 + uLevel * 0.38 + uBeat * 0.3);
+  // Bass beat now punches harder here.
+  float exposure = min(1.65, 0.82 + uLevel * 0.36 + uBeat * 0.5);
   color *= exposure;
 
   float d = length(vUv - 0.5);
-  float glow = uGlow * (0.1 + uBass * 0.6 + uBeat * 0.4) * smoothstep(0.85, 0.0, d);
+  float glow = uGlow * (0.1 + uBass * 0.6 + uBeat * 0.7) * smoothstep(0.85, 0.0, d);
   color += glow * hueRotate(palette(gBase + 0.15) + 0.1, uHueShift);
 
-  color += uBeat * 0.06;
+  // Bass shockwave — a bright ring that expands from the center on each hit and
+  // fades in ~0.25 s. uBeatAge is seconds since the last strong beat.
+  float ringDist = (d - uBeatAge * 1.15) * 7.0;
+  float ring = exp(-uBeatAge * 5.0) * exp(-ringDist * ringDist);
+  color += ring * 0.7 * (hueRotate(palette(gBase + 0.42) + 0.12, uHueShift));
+
+  color += uBeat * uBeat * 0.12;
 
   // Surface texture as a light luminance veil — grain / filament detail over
   // the color. Kept small so it never buries the waves.
@@ -255,6 +268,17 @@ void main() {
   color = (color - 0.5) * uContrast + 0.5;
   color *= uBrightness;
   color = max(color, 0.0);
+
+  // Mechanical hit — a brief cold "steel" flash plus sparse white sparks, so a
+  // click / snare / metallic transient reads as a sharp crack, not a bloom.
+  float steel = uHit * uHit;
+  if (steel > 0.001) {
+    float lum = dot(color, vec3(0.3, 0.5, 0.2));
+    vec3 metal = vec3(lum) * vec3(0.82, 0.9, 1.12) + 0.04;
+    color = mix(color, metal, steel * 0.4);
+    float spark = step(0.9925, hash21(gl_FragCoord.xy * 0.7 + floor(uTime * 45.0)));
+    color += spark * uHit * 0.9;
+  }
 
   // Roll off highlights well before pure white so structure stays readable.
   color = color / (1.0 + max(color - 0.65, 0.0) * 1.3);

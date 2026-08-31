@@ -123,6 +123,8 @@ export function ShaderBackground({
       uTreble: { value: 0 },
       uLevel: { value: 0 },
       uBeat: { value: 0 },
+      uBeatAge: { value: 10 },
+      uHit: { value: 0 },
       uC0: { value: colors[0] },
       uC1: { value: colors[1] },
       uC2: { value: colors[2] },
@@ -161,6 +163,7 @@ export function ShaderBackground({
     let hueAccum = 0
     let sectionBright = 0.25
     let paletteScroll = 0
+    let beatAge = 10
 
     // Adaptive resolution: if the GPU can't keep up, keep dropping the internal
     // render size so the page stays responsive instead of locking the machine.
@@ -194,6 +197,7 @@ export function ShaderBackground({
         treble: 0,
         level: 0,
         beat: 0,
+        hit: 0,
         centroid: 0.25,
       }
 
@@ -206,7 +210,14 @@ export function ShaderBackground({
       const bass = Math.min(1.2, bands.bass * p.bassReact)
       const mid = Math.min(1.2, bands.mid * p.midReact)
       const treble = Math.min(1.2, bands.treble * p.trebleReact)
-      const beat = Math.min(1.2, bands.beat * p.beatReact)
+      const beat = Math.min(1.4, bands.beat * p.beatReact)
+      const hit = Math.min(1.3, bands.hit * p.hitReact)
+
+      // Age of the last strong bass hit — drives an expanding shockwave ring.
+      if (beat > 0.55 && beatAge > 0.12) {
+        beatAge = 0
+      }
+      beatAge += dt
 
       // Flow clock, integrated so audio-driven speed never snaps the phase.
       const flowRate =
@@ -233,6 +244,8 @@ export function ShaderBackground({
       uniforms.uTreble.value = treble
       uniforms.uLevel.value = bands.level
       uniforms.uBeat.value = beat
+      uniforms.uBeatAge.value = beatAge
+      uniforms.uHit.value = hit
 
       uniforms.uPaletteShift.value = sectionBright * 0.45 + paletteScroll
       uniforms.uHueShift.value = hueAccum
