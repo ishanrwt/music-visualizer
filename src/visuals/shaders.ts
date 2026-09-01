@@ -20,6 +20,7 @@ uniform float uTreble;
 uniform float uLevel;
 uniform float uBeat;
 uniform float uBeatAge;
+uniform float uBeatPunch;
 uniform float uHit;
 
 uniform vec3 uC0;
@@ -208,8 +209,51 @@ void main() {
     // Ridgeline — sharp veins.
     float r = 1.0 - abs(wave);
     f = smoothstep(0.12, 1.0, r * r * 1.7 + fold * 0.4);
+  } else if (mode == 4) {
+    // Kaleidoscope — six-fold radial mirror symmetry.
+    float ang = atan(wp.y, wp.x);
+    float rad = length(wp);
+    float seg = 6.2831853 / 6.0;
+    ang = abs(mod(ang + t * 0.15, seg) - seg * 0.5);
+    vec2 kp = vec2(cos(ang), sin(ang)) * rad;
+    float kn = fbm3(kp * 1.5 + t * 0.2);
+    f = 0.5 + 0.5 * sin(kn * 3.5 + rad * 3.2 - t * 0.8);
+  } else if (mode == 5) {
+    // Tunnel — rings and spokes receding into the distance.
+    float ang = atan(wp.y, wp.x);
+    float rad = length(wp) + 0.12;
+    float depth = 0.4 / rad + t * 0.6;
+    float rings = 0.5 + 0.5 * sin(depth * 10.0);
+    float spokes = 0.5 + 0.5 * sin(ang * 8.0 + depth * 2.0);
+    f = mix(rings, rings * spokes, 0.45) * smoothstep(0.0, 0.5, rad);
+  } else if (mode == 6) {
+    // Cells — animated Voronoi mosaic.
+    vec2 gp = wp * 2.0;
+    vec2 gi = floor(gp);
+    vec2 gf = fract(gp);
+    float md = 1.5;
+    for (int y = 0; y < 3; y++) {
+      for (int x = 0; x < 3; x++) {
+        vec2 o = vec2(float(x) - 1.0, float(y) - 1.0);
+        vec2 rnd = vec2(hash21(gi + o), hash21(gi + o + 21.3));
+        rnd = 0.5 + 0.45 * sin(t * 0.8 + 6.2831853 * rnd);
+        md = min(md, length(o + rnd - gf));
+      }
+    }
+    f = smoothstep(0.05, 0.95, md);
+  } else if (mode == 7) {
+    // Contours — stepped topographic map.
+    float h = 0.5 + 0.55 * wave + fold * 0.22;
+    float steps = floor(h * 6.0) / 6.0;
+    float edge = fract(h * 6.0 - t * 0.25);
+    float rim = smoothstep(0.0, 0.12, edge) * smoothstep(0.4, 0.14, edge);
+    f = steps + rim * 0.55;
+  } else if (mode == 8) {
+    // Marble — turbulent veined stone.
+    float veins = sin((wp.x - wp.y) * 1.8 + (fold * 2.0 + detail) * 3.5 + t * 0.3);
+    f = pow(0.5 + 0.5 * veins, 1.4) * 0.9 + 0.08;
   } else {
-    // Aurora — folded ribbons.
+    // Lava Lamp — big folded blobs / ribbons (the default look).
     float ribbons = 0.5 + 0.5 * sin(wave * 5.0 + wp.y * 1.3 + t * 0.7);
     f = mix(0.5 + 0.5 * wave + fold * 0.3, ribbons, 0.5);
   }
@@ -256,7 +300,8 @@ void main() {
   // fades in ~0.25 s. uBeatAge is seconds since the last strong beat.
   float ringDist = (d - uBeatAge * 1.15) * 7.0;
   float ring = exp(-uBeatAge * 5.0) * exp(-ringDist * ringDist);
-  color += ring * 0.7 * (hueRotate(palette(gBase + 0.42) + 0.12, uHueShift));
+  color += ring * (0.35 + uBeatPunch * 0.7) *
+    (hueRotate(palette(gBase + 0.42) + 0.12, uHueShift));
 
   color += uBeat * uBeat * 0.12;
 

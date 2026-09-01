@@ -2,6 +2,11 @@ import {
   BAND_CURVE,
   BAND_GAIN,
   BASS_RANGE_HZ,
+  BEAT_DECAY,
+  BEAT_HISTORY_FRAMES,
+  BEAT_MIN_GAP_FRAMES,
+  BEAT_SENSITIVITY,
+  KICK_RANGE_HZ,
   MID_RANGE_HZ,
   SMOOTHING_ATTACK,
   SMOOTHING_RELEASE,
@@ -92,8 +97,13 @@ export class FrequencyAnalyser {
   private bassEnd: number
   private midEnd: number
   private trebleEnd: number
-  private prevBass = 0
+  private kickStart: number
+  private kickEnd: number
   private prevHi: Float32Array
+  private kickHistory = new Float32Array(BEAT_HISTORY_FRAMES)
+  private kickHistIdx = 0
+  private kickHistLen = 0
+  private framesSinceBeat = 999
 
   constructor(analyser: AnalyserNode) {
     this.analyser = analyser
@@ -112,6 +122,71 @@ export class FrequencyAnalyser {
       sampleRate,
       fftSize,
     )
+    this.kickStart = hzToBin(KICK_RANGE_HZ[0], sampleRate, fftSize)
+    this.kickEnd = hzToBin(KICK_RANGE_HZ[1], sampleRate, fftSize)
+  }
+
+  /** Instantaneous kick-band energy (mean of squared bin magnitudes, 0–1). */
+  private kickEnergy(): number {
+    let sum = 0
+    let count = 0
+    for (
+      let i = Math.max(1, this.kickStart);
+      i <= this.kickEnd && i < this.data.length;
+      i++
+    ) {
+      const v = (this.data[i] ?? 0) / 255
+      sum += v * v
+      count += 1
+    }
+    return count > 0 ? sum / count : 0
+  }
+
+  /**
+   * Adaptive beat detection: compare current kick energy to its rolling local
+   * average + variance, fire on a real margin, enforce a refractory gap, and
+   * return an onset strength scaled by how hard the hit exceeded the average.
+   */
+  private detectBeat(): number {
+    const energy = this.kickEnergy()
+
+    const n = this.kickHistLen
+    let mean = 0
+    for (let i = 0; i < n; i++) {
+      mean += this.kickHistory[i]!
+    }
+    mean = n > 0 ? mean / n : 0
+
+    let varSum = 0
+    for (let i = 0; i < n; i++) {
+      const d = this.kickHistory[i]! - mean
+      varSum += d * d
+    }
+    const variance = n > 0 ? varSum / n : 0
+
+    // Steadier signal (low variance) needs a clearer jump to count as a beat.
+    const sens = BEAT_SENSITIVITY + Math.max(0, 0.18 - variance * 5)
+
+    this.framesSinceBeat += 1
+    let strength = 0
+    if (
+      n >= 16 &&
+      energy > mean * sens &&
+      energy - mean > 0.015 &&
+      this.framesSinceBeat >= BEAT_MIN_GAP_FRAMES
+    ) {
+      strength = Math.min(
+        1,
+        ((energy - mean) / (mean + 0.12)) * 2.0 + 0.4,
+      )
+      this.framesSinceBeat = 0
+    }
+
+    this.kickHistory[this.kickHistIdx] = energy
+    this.kickHistIdx = (this.kickHistIdx + 1) % BEAT_HISTORY_FRAMES
+    this.kickHistLen = Math.min(this.kickHistLen + 1, BEAT_HISTORY_FRAMES)
+
+    return strength
   }
 
   /**
@@ -142,11 +217,9 @@ export class FrequencyAnalyser {
       this.snapshot.mid * 0.35 +
       this.snapshot.treble * 0.15
 
-    // Bass transient: rectified rise in raw bass above a small floor, sharp
-    // decay so it reads as a punch. Gain is deliberately hot.
-    const rise = Math.max(0, rawBass - this.prevBass - 0.015) * 6.0
-    this.prevBass = rawBass
-    this.snapshot.beat = Math.max(this.snapshot.beat * 0.78, Math.min(1, rise))
+    // Bass beat — adaptive energy-based onset detection (see detectBeat).
+    const beatStrength = this.detectBeat()
+    this.snapshot.beat = Math.max(this.snapshot.beat * BEAT_DECAY, beatStrength)
 
     // "Mechanical" hit: positive spectral flux across the high band. Sustained
     // treble contributes nothing — only sharp per-bin rises (clicks, snares,

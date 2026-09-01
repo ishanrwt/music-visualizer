@@ -92,24 +92,26 @@ export function CommandPalette({
         <BandMeters analyserNode={analyserNode} />
 
         <SectionLabel>Effect</SectionLabel>
-        <div className="grid grid-cols-2 gap-1.5">
+        <div className="flex flex-wrap gap-1.5">
           {VISUAL_MODES.map((mode, index) => (
             <button
               key={mode.id}
               type="button"
               title={mode.hint}
               onClick={() => set('mode', index)}
-              className={`rounded-lg border px-2 py-2 text-left text-xs transition ${
+              className={`rounded-full border px-3 py-1 text-[11px] transition ${
                 params.mode === index
-                  ? 'border-white/40 bg-white/15 text-white'
+                  ? 'border-white/40 bg-white/15 font-medium text-white'
                   : 'border-white/10 bg-white/[0.03] text-zinc-400 hover:border-white/20 hover:text-zinc-200'
               }`}
             >
-              <span className="block font-medium">{mode.label}</span>
-              <span className="block text-[10px] text-zinc-500">{mode.hint}</span>
+              {mode.label}
             </button>
           ))}
         </div>
+        <p className="mt-1.5 text-[10px] text-zinc-500">
+          {VISUAL_MODES[params.mode]?.hint}
+        </p>
 
         <SectionLabel>Presets</SectionLabel>
         <div className="flex flex-wrap gap-1.5">

@@ -58,10 +58,15 @@ export type VisualMode = {
 
 /** Order matters — array index is the `uMode` value in the shader. */
 export const VISUAL_MODES: VisualMode[] = [
-  { id: 'aurora', label: 'Aurora', hint: 'Chaotic flowing ribbons' },
+  { id: 'lava', label: 'Lava Lamp', hint: 'Big folded blobs drifting through the palette' },
   { id: 'nebula', label: 'Nebula', hint: 'Billowing turbulence' },
   { id: 'plasma', label: 'Plasma', hint: 'Interference over chaos' },
   { id: 'ridge', label: 'Ridgeline', hint: 'Sharp carved veins' },
+  { id: 'kaleido', label: 'Kaleidoscope', hint: 'Six-fold mirror symmetry' },
+  { id: 'tunnel', label: 'Tunnel', hint: 'Rings receding into the distance' },
+  { id: 'cells', label: 'Cells', hint: 'Animated Voronoi mosaic' },
+  { id: 'contours', label: 'Contours', hint: 'Stepped topographic map' },
+  { id: 'marble', label: 'Marble', hint: 'Turbulent veined stone' },
 ]
 
 export const DEFAULT_PARAMS: VisualParams = {

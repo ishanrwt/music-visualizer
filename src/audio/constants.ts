@@ -1,10 +1,10 @@
 /**
  * FFT size for the AnalyserNode. Frequency resolution ≈ sampleRate / FFT_SIZE.
- * Smaller = more time-localized = snappier reaction to transients, at the cost
- * of low-end frequency resolution. 1024 keeps the 3-band split usable while
- * shaving the analysis window to ~21 ms.
+ * 2048 (~43 ms window at 48 kHz) gives the low end enough bins (~23 Hz each) for
+ * a stable bass-energy estimate — the beat detector needs that more than it
+ * needs the extra ~20 ms of time-localisation.
  */
-export const FFT_SIZE = 1024
+export const FFT_SIZE = 2048
 
 /**
  * Bass band in Hz. Kept tight to the kick / sub region so it tracks the beat
@@ -47,3 +47,20 @@ export const BAND_GAIN = {
  * lift quiet detail; above 1 would crush it. 0.75 gives a gentle lift.
  */
 export const BAND_CURVE = 0.75
+
+/**
+ * Beat detector (adaptive spectral energy).
+ *
+ * Instantaneous bass energy is compared against its own rolling local average.
+ * A beat fires when it exceeds `average × sensitivity` by a real margin, with a
+ * refractory gap so one kick can't retrigger for a few frames. This adapts to
+ * loud and quiet tracks alike, unlike a fixed frame-to-frame delta threshold.
+ */
+export const BEAT_HISTORY_FRAMES = 48
+export const BEAT_MIN_GAP_FRAMES = 5
+/** Base ratio over the local average that counts as an onset. */
+export const BEAT_SENSITIVITY = 1.3
+/** Per-frame envelope decay after a beat — lower = snappier. */
+export const BEAT_DECAY = 0.85
+/** Kick band in Hz for the detector — a touch wider than BASS_RANGE_HZ to catch kick body. */
+export const KICK_RANGE_HZ = [30, 180] as const
