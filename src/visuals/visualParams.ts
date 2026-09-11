@@ -48,6 +48,10 @@ export type VisualParams = {
   chroma: number
   /** Bass-driven center bloom. */
   glow: number
+  /** Presence of the zoomed, blurred album-cover background behind the waves (0 = flat dark). */
+  coverAmount: number
+  /** How legible the album cover stays in the waves (0 = fully liquified, 1 = only rippled). */
+  coverFocus: number
 }
 
 export type VisualMode = {
@@ -86,11 +90,13 @@ export const DEFAULT_PARAMS: VisualParams = {
   contrast: 1.22,
   saturation: 1.3,
   colorSpread: 0.6,
-  colorCycle: 1,
+  colorCycle: 0,
   vignette: 0.35,
   grain: 0.05,
   chroma: 0.45,
   glow: 0.5,
+  coverAmount: 0.9,
+  coverFocus: 0.55,
 }
 
 export type VisualPreset = {
@@ -247,10 +253,12 @@ export const SLIDERS: SliderSpec[] = [
   { key: 'grain', label: 'Grain', min: 0, max: 0.3, step: 0.005, group: 'Post' },
   { key: 'chroma', label: 'Chroma split', min: 0, max: 1, step: 0.01, group: 'Post' },
   { key: 'glow', label: 'Bass glow', min: 0, max: 1, step: 0.01, group: 'Post' },
+  { key: 'coverAmount', label: 'Cover background', min: 0, max: 1, step: 0.01, group: 'Post' },
+  { key: 'coverFocus', label: 'Cover clarity', min: 0, max: 1, step: 0.01, group: 'Post' },
 ]
 
 // Bumped on each field/color model change so old stored values don't mismap.
-const STORAGE_KEY = 'music-visual:params:v3'
+const STORAGE_KEY = 'music-visual:params:v5'
 
 export function loadParams(): VisualParams {
   try {

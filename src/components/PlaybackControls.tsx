@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { TestTrack } from '../audio/tracks.ts'
 
 type PlaybackControlsProps = {
@@ -19,6 +20,16 @@ export function PlaybackControls({
 }: PlaybackControlsProps) {
   return (
     <div className="flex flex-col gap-3">
+      <div className="flex items-center gap-3">
+        <Cover key={currentTrack.id} track={currentTrack} />
+        <div className="min-w-0">
+          <p className="truncate text-sm text-zinc-100">{currentTrack.name}</p>
+          <p className="text-[11px] text-zinc-500">
+            {isPlaying ? 'Playing' : 'Paused'}
+          </p>
+        </div>
+      </div>
+
       <label className="flex flex-col gap-1 text-left text-xs text-zinc-400">
         Track
         <select
@@ -42,11 +53,28 @@ export function PlaybackControls({
         {isPlaying ? 'Pause' : 'Play'}
       </button>
 
-      <p className="text-[11px] text-zinc-500">
-        Now playing:{' '}
-        <span className="text-zinc-300">{currentTrack.name}</span>
-      </p>
       {error ? <p className="text-xs text-red-400">{error}</p> : null}
     </div>
+  )
+}
+
+function Cover({ track }: { track: TestTrack }) {
+  const [failed, setFailed] = useState(false)
+
+  if (failed) {
+    return (
+      <div className="grid h-14 w-14 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/[0.04] text-[10px] text-zinc-600">
+        ♪
+      </div>
+    )
+  }
+
+  return (
+    <img
+      src={track.albumArtUrl}
+      alt={`${track.name} cover`}
+      className="h-14 w-14 shrink-0 rounded-lg border border-white/10 object-cover"
+      onError={() => setFailed(true)}
+    />
   )
 }

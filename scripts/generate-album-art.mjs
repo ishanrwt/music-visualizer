@@ -81,6 +81,7 @@ const outDir = path.resolve(
   '../public/albums',
 )
 
+writePng(path.join(outDir, 'e85.png'), gradient([20, 8, 36], [236, 92, 28]))
 writePng(path.join(outDir, 'stateside.png'), gradient([232, 64, 148], [48, 72, 196]))
 writePng(path.join(outDir, 'stronger.png'), gradient([240, 168, 32], [28, 24, 72]))
 writePng(path.join(outDir, 'walk-it-talk-it.png'), gradient([16, 48, 40], [212, 168, 64]))

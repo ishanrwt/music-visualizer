@@ -1,11 +1,19 @@
 import { useEffect, useRef } from 'react'
 import {
+  CanvasTexture,
+  ClampToEdgeWrapping,
   Color,
+  DataTexture,
+  LinearFilter,
+  LinearMipmapLinearFilter,
   Mesh,
   OrthographicCamera,
   PlaneGeometry,
+  RGBAFormat,
   Scene,
   ShaderMaterial,
+  SRGBColorSpace,
+  type Texture,
   Vector2,
   WebGLRenderer,
 } from 'three'
@@ -53,10 +61,56 @@ export function ShaderBackground({
     FALLBACK_COLORS.map(([r, g, b]) => new Color(r, g, b)),
   )
   const paramsRef = useRef<VisualParams>(params)
+  // Album cover, cropped square and uploaded with mipmaps for cheap blur.
+  const coverTexRef = useRef<Texture | null>(null)
 
   useEffect(() => {
     paramsRef.current = params
   }, [params])
+
+  useEffect(() => {
+    let cancelled = false
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      if (cancelled) {
+        return
+      }
+      const size = 1024
+      const cvs = document.createElement('canvas')
+      cvs.width = size
+      cvs.height = size
+      const ctx = cvs.getContext('2d')
+      if (!ctx) {
+        return
+      }
+      const crop = Math.min(img.naturalWidth, img.naturalHeight)
+      ctx.drawImage(
+        img,
+        (img.naturalWidth - crop) / 2,
+        (img.naturalHeight - crop) / 2,
+        crop,
+        crop,
+        0,
+        0,
+        size,
+        size,
+      )
+      const tex = new CanvasTexture(cvs)
+      tex.colorSpace = SRGBColorSpace
+      tex.minFilter = LinearMipmapLinearFilter
+      tex.magFilter = LinearFilter
+      tex.generateMipmaps = true
+      tex.wrapS = ClampToEdgeWrapping
+      tex.wrapT = ClampToEdgeWrapping
+      tex.needsUpdate = true
+      coverTexRef.current = tex
+    }
+    img.src = albumArtUrl
+    return () => {
+      cancelled = true
+    }
+  }, [albumArtUrl])
 
   useEffect(() => {
     if (!analyserNode) {
@@ -93,6 +147,8 @@ export function ShaderBackground({
       return
     }
 
+    // Transparent so the album-cover DOM layer behind the canvas shows through
+    // the wave troughs (alpha is written per-fragment in the shader).
     const renderer = new WebGLRenderer({ antialias: false, alpha: false })
     renderer.setPixelRatio(1)
     renderer.setSize(
@@ -111,6 +167,15 @@ export function ShaderBackground({
     const geometry = new PlaneGeometry(2, 2)
 
     const colors = colorsRef.current
+
+    // Dark 1×1 stand-in until the cover texture is ready.
+    const placeholderTex = new DataTexture(
+      new Uint8Array([5, 5, 8, 255]),
+      1,
+      1,
+      RGBAFormat,
+    )
+    placeholderTex.needsUpdate = true
 
     const uniforms = {
       uTime: { value: 0 },
@@ -147,6 +212,9 @@ export function ShaderBackground({
       uGrain: { value: DEFAULT_PARAMS.grain },
       uChroma: { value: DEFAULT_PARAMS.chroma },
       uGlow: { value: DEFAULT_PARAMS.glow },
+      uCover: { value: placeholderTex as Texture },
+      uCoverAmount: { value: DEFAULT_PARAMS.coverAmount },
+      uCoverFocus: { value: DEFAULT_PARAMS.coverFocus },
     }
 
     const material = new ShaderMaterial({
@@ -271,6 +339,17 @@ export function ShaderBackground({
       uniforms.uGrain.value = p.grain
       uniforms.uChroma.value = p.chroma
       uniforms.uGlow.value = p.glow
+      uniforms.uCoverAmount.value = p.coverAmount
+      uniforms.uCoverFocus.value = p.coverFocus
+
+      const nextCover = coverTexRef.current
+      if (nextCover && uniforms.uCover.value !== nextCover) {
+        const old = uniforms.uCover.value
+        uniforms.uCover.value = nextCover
+        if (old && old !== placeholderTex) {
+          old.dispose()
+        }
+      }
 
       renderer.render(scene, camera)
       rafId = requestAnimationFrame(tick)
@@ -308,6 +387,9 @@ export function ShaderBackground({
       material.dispose()
       renderer.dispose()
       renderer.domElement.remove()
+      placeholderTex.dispose()
+      coverTexRef.current?.dispose()
+      coverTexRef.current = null
     }
   }, [])
 

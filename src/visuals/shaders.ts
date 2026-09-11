@@ -32,6 +32,13 @@ uniform float uPaletteShift;
 uniform float uHueShift;
 uniform float uColorSpread;
 
+// The album cover (pre-squared 1024² texture with mipmaps). It IS the palette:
+// the blurred zoomed cover is the background and the waves are the cover
+// liquified by the field.
+uniform sampler2D uCover;
+uniform float uCoverAmount;
+uniform float uCoverFocus;
+
 uniform float uMode;
 uniform float uWarp;
 uniform float uChaos;
@@ -156,6 +163,18 @@ vec3 adjustSaturation(vec3 c, float s) {
   return mix(vec3(l), c, s);
 }
 
+// Map a screen-space coord to the square cover texture, filling the screen
+// (crop the longer axis) rather than letterboxing.
+vec2 coverFit(vec2 q) {
+  float sa = uResolution.x / max(uResolution.y, 1.0);
+  if (sa > 1.0) {
+    q.y = (q.y - 0.5) / sa + 0.5;
+  } else {
+    q.x = (q.x - 0.5) * sa + 0.5;
+  }
+  return q;
+}
+
 void main() {
   vec2 uv = vUv * 2.0 - 1.0;
   float aspect = uResolution.x / max(uResolution.y, 1.0);
@@ -171,7 +190,11 @@ void main() {
   float warpAmt = 0.26 + uWarp * 0.36 + uChaos * 0.5;
   warpAmt *= 1.0 + uBass * 0.14 + uBeat * 0.12;
 
-  float rot = t * 0.05 + uMid * 0.12;
+  // t is integrated on the CPU, so its rate can react to the music without
+  // ever snapping. uMid used to be added to the angle directly here — an
+  // unintegrated instantaneous value driving a whole-plane rotation, which
+  // swung the picture hard left-right the instant the mids moved. Removed.
+  float rot = t * 0.05;
   float cs = cos(rot);
   float sn = sin(rot);
   vec2 p = mat2(cs, -sn, sn, cs) * (uv * uScale);
@@ -265,27 +288,62 @@ void main() {
   // the palette / hue rotation are doing. ~3:1 bright-to-dark across the field.
   float waveLum = smoothstep(0.08, 0.92, f);
 
-  // Gradient coordinate. Spread kept gentle now that brightness carries the
-  // wave shape — the palette adds color variety without strobing.
+  // Accent coordinate for glow / ring tints (still album colors via palette()).
   float gBase = uPaletteShift + uBass * 0.05 - uTreble * 0.06 + t * 0.008;
-  float spread = 0.22 + uColorSpread * 0.55;
-  float cpos = f * spread + gBase;
+  // Kept small and symmetric (see waveCol below) — this used to also spike
+  // hard on uHit and get added as a straight UV translation, which is what
+  // was making the whole image lurch left-right the instant a hit landed.
+  float chroma = uChroma * (0.004 + uTreble * 0.01 + uMid * 0.004);
 
-  float chroma = uChroma * (0.015 + uTreble * 0.04 + uMid * 0.02) + uHit * 0.13;
-  vec3 color = vec3(
-    palette(cpos + chroma).r,
-    palette(cpos).g,
-    palette(cpos - chroma).b
+  // -- Colour, taken straight from the album cover -----------------------
+  // uCoverFocus (0 = fully liquified wave-art, 1 = cover stays legible with the
+  // waves only rippling it) drives distortion, blur and how much the wave
+  // brightness is allowed to crush the image.
+  float warpK = mix(0.075, 0.016, uCoverFocus);
+  float fieldK = mix(0.16, 0.035, uCoverFocus);
+  float bgBias = mix(4.6, 2.0, uCoverFocus);
+  float lumFloor = mix(0.5, 0.82, uCoverFocus);
+
+  // Background: the cover zoomed in and blurred (mip bias). Its drift uses the
+  // plain wall clock (uTime), not the audio-accelerated flow clock (t) — this
+  // is what was making it look like it was "lagging": its speed was jumping
+  // around with the music instead of drifting at one calm, constant rate.
+  vec2 bgUv = coverFit((vUv - 0.5) * (0.7 - uBass * 0.012) + 0.5);
+  bgUv += vec2(sin(uTime * 0.05), cos(uTime * 0.042)) * 0.01;
+  bgUv = clamp(bgUv, 0.002, 0.998);
+  vec3 bg = (
+    texture2D(uCover, bgUv, bgBias).rgb +
+    texture2D(uCover, bgUv + vec2(0.02, -0.02), bgBias).rgb
+  ) * 0.5;
+  bg = mix(vec3(0.02, 0.02, 0.03), bg * mix(0.6, 0.85, uCoverFocus),
+    clamp(uCoverAmount, 0.0, 1.0));
+
+  // Waves: the cover displaced by the domain warp + field.
+  vec2 wUv = coverFit(vUv);
+  wUv += (wp - p) * (warpK + uColorSpread * 0.05);
+  wUv += vec2(f - 0.5, wave * 0.4) * fieldK;
+  wUv = clamp(wUv, 0.002, 0.998);
+  float waveBias = mix(1.4, 0.4, uCoverFocus);
+  // True chromatic aberration — R and B channels sample a hair either side of
+  // the same point rather than the whole lookup being shifted, so this can
+  // never read as the picture sliding around, only as a faint colour fringe.
+  vec3 waveCol = vec3(
+    texture2D(uCover, clamp(wUv + vec2(chroma, 0.0), 0.002, 0.998), waveBias).r,
+    texture2D(uCover, wUv, waveBias).g,
+    texture2D(uCover, clamp(wUv - vec2(chroma, 0.0), 0.002, 0.998), waveBias).b
   );
+  float wl = dot(waveCol, vec3(0.299, 0.587, 0.114));
+  waveCol = mix(vec3(wl), waveCol, mix(1.55, 1.2, uCoverFocus));
+  waveCol = (waveCol - 0.5) * mix(1.22, 1.06, uCoverFocus) + 0.5;
+  waveCol = max(waveCol, 0.0);
 
-  // A second palette read on the crests for extra simultaneous color.
-  float crest = smoothstep(0.65, 1.1, f);
-  color = mix(color, palette(cpos + 0.33 + uMid * 0.2), crest * 0.4);
+  vec3 color = mix(bg, waveCol, waveLum * 0.82 + 0.12);
 
   color = hueRotate(color, uHueShift);
 
-  // Impose the wave brightness structure.
-  color *= 0.42 + 1.0 * waveLum;
+  // Impose the wave brightness structure (softened when focus is high).
+  color *= lumFloor + (1.0 - lumFloor) * (waveLum * 1.7);
+  color = min(color, vec3(1.4));
 
   // Exposure — bounded so loud passages brighten but never blow out to white.
   // Bass beat now punches harder here.
