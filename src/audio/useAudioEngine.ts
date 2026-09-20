@@ -7,6 +7,9 @@ export function useAudioEngine() {
   const [currentTrackId, setCurrentTrackId] = useState(TEST_TRACKS[0]!.id)
   const [isPlaying, setIsPlaying] = useState(false)
   const [analyserNode, setAnalyserNode] = useState<AnalyserNode | null>(null)
+  const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(
+    null,
+  )
   const [error, setError] = useState<string | null>(null)
 
   if (engineRef.current === null) {
@@ -25,6 +28,7 @@ export function useAudioEngine() {
       await engine.play(track.url)
       setError(null)
       setAnalyserNode(engine.getAnalyser())
+      setAudioElement(engine.getAudioElement())
       setIsPlaying(true)
     } catch (cause) {
       setIsPlaying(false)
@@ -86,6 +90,7 @@ export function useAudioEngine() {
     currentTrack,
     isPlaying,
     analyserNode,
+    audioElement,
     error,
     toggle,
     selectTrack,

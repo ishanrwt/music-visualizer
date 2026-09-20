@@ -52,6 +52,8 @@ export type VisualParams = {
   coverAmount: number
   /** How legible the album cover stays in the waves (0 = fully liquified, 1 = only rippled). */
   coverFocus: number
+  /** Opacity of a crisp, undistorted album-cover card floating on top of everything (0 = hidden). */
+  coverOverlay: number
 }
 
 export type VisualMode = {
@@ -97,6 +99,7 @@ export const DEFAULT_PARAMS: VisualParams = {
   glow: 0.5,
   coverAmount: 0.9,
   coverFocus: 0.55,
+  coverOverlay: 0.92,
 }
 
 export type VisualPreset = {
@@ -255,6 +258,7 @@ export const SLIDERS: SliderSpec[] = [
   { key: 'glow', label: 'Bass glow', min: 0, max: 1, step: 0.01, group: 'Post' },
   { key: 'coverAmount', label: 'Cover background', min: 0, max: 1, step: 0.01, group: 'Post' },
   { key: 'coverFocus', label: 'Cover clarity', min: 0, max: 1, step: 0.01, group: 'Post' },
+  { key: 'coverOverlay', label: 'Cover overlay', min: 0, max: 1, step: 0.01, group: 'Post' },
 ]
 
 // Bumped on each field/color model change so old stored values don't mismap.

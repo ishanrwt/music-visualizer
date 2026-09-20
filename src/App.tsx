@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
 import { CommandPalette } from './components/CommandPalette.tsx'
-import { PlaybackControls } from './components/PlaybackControls.tsx'
+import { CoverOverlay } from './components/CoverOverlay.tsx'
+import { LyricsDisplay } from './components/LyricsDisplay.tsx'
+import { PlayerPanel } from './components/PlayerPanel.tsx'
 import { useAudioEngine } from './audio/useAudioEngine.ts'
+import { useLyrics } from './lyrics/useLyrics.ts'
 import { ShaderBackground } from './visuals/ShaderBackground.tsx'
 import {
   DEFAULT_PARAMS,
@@ -16,11 +19,13 @@ function App() {
     currentTrack,
     isPlaying,
     analyserNode,
+    audioElement,
     error,
     toggle,
     selectTrack,
   } = useAudioEngine()
 
+  const lyricLines = useLyrics(currentTrack.lyricsUrl)
   const [params, setParams] = useState<VisualParams>(loadParams)
 
   useEffect(() => {
@@ -35,18 +40,16 @@ function App() {
         params={params}
       />
 
-      <div className="absolute top-6 left-6 z-10 w-72 max-w-[calc(100vw-3rem)] rounded-2xl border border-white/12 bg-zinc-950/70 p-4 shadow-2xl shadow-black/50 backdrop-blur-xl">
-        <h1 className="text-sm font-medium">Music Visualizer</h1>
-        <p className="mb-4 text-[11px] text-zinc-500">Reactive shader background</p>
-        <PlaybackControls
-          tracks={tracks}
-          currentTrack={currentTrack}
-          isPlaying={isPlaying}
-          error={error}
-          onSelectTrack={selectTrack}
-          onToggle={toggle}
-        />
-      </div>
+      <CoverOverlay track={currentTrack} amount={params.coverOverlay} />
+
+      <PlayerPanel
+        tracks={tracks}
+        currentTrack={currentTrack}
+        isPlaying={isPlaying}
+        error={error}
+        onSelectTrack={selectTrack}
+        onToggle={toggle}
+      />
 
       <CommandPalette
         params={params}
@@ -54,6 +57,8 @@ function App() {
         onReset={() => setParams({ ...DEFAULT_PARAMS })}
         analyserNode={analyserNode}
       />
+
+      <LyricsDisplay lines={lyricLines} audioElement={audioElement} />
     </main>
   )
 }
